@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eclip-thesis-analysis"
+version = "0.1.0"
+description = "Focused analyses for a replicate-supervised eCLIP reconstruction thesis"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26,<3", "pandas>=2.0,<3", "scipy>=1.10,<2", "pysam>=0.22"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+motifs = ["pymemesuite>=0.1.0a4"]
+
+[project.scripts]
+eclip-thesis-analysis = "eclip_thesis_analysis.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
