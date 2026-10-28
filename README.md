@@ -50,7 +50,7 @@ eclip-thesis-analysis paired-tests --input outputs/all_diagnostic.tsv \
 
 ### Reconstruction comparisons
 
-`train-controls` fits the four prespecified TARDBP configurations on the same prepared windows and two seeds. The `shuffled` configuration uses a reproducible within-window Eulerian dinucleotide shuffle, held fixed across seeds. It writes checkpoints and prediction NPZ files for each configuration. This command requires the sibling tool package to be installed.
+`train-controls` fits the four prespecified TARDBP configurations on the same prepared windows and two seeds. The `shuffled` configuration uses a reproducible within-window Eulerian dinucleotide shuffle, held fixed across seeds. It writes checkpoints and prediction NPZ files for each configuration. This command requires `eclip-reconstruct`, installed as shown above.
 
 ```bash
 eclip-thesis-analysis train-controls --data outputs/tardbp_windows.npz \
