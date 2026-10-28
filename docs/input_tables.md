@@ -2,6 +2,18 @@
 
 All tables are UTF-8, tab-delimited, and have a header row. Genomic coordinates are zero-based and half-open. `chrom` values must use the same assembly and naming convention across inputs. A genomic block is `chrom` plus the integer quotient of `start / 1,000,000`.
 
+## `coverage-presence` and `diagnostic-contrasts`
+
+Both commands read the prepared-window NPZ from `eclip-reconstruct prepare`, with aligned `ip1`, `ip2`, and `sminput` arrays and `window_id`, `chrom`, and `start` metadata. Supply the intended peak-derived evaluation population. `coverage-presence` counts positive measured IP coverage per window. `diagnostic-contrasts` emits one Pearson and one EMD contrast per eligible window; the Pearson calculation uses log-transformed coverage, while EMD uses raw positive coverage.
+
+## `peak-diagnostics` and `peak-shape-tests`
+
+`peak-diagnostics` takes the two complete, replicate-specific published CLIPper narrowPeak files and six strand-specific bigWigs: positive- and negative-strand tracks for IP1, IP2, and SMInput. The peak files need columns 1–3 for genomic coordinates and column 6 for strand. Negative-strand bigWig signal is interpreted as negative-valued genomic signal and reversed into transcript orientation. The command uses canonical GRCh38 chromosomes and reports only valid peak intervals.
+
+The per-IP summary contains peak counts, same-strand overlap fraction, a shared base-pair Jaccard estimate with a pointwise 95% chromosome-stratified 1 Mb block-bootstrap interval, and matched summit displacement. For each peak called by only one IP, `partner_support` classifies the partner IP's summed coverage relative to SMInput within both the exact published interval and a 300 nt window centred on the calling-IP summit. `shape` contains sampled shared and replicate-specific peak measurements: reported width, contiguous half-height span around the calling-IP maximum, and maximum-to-mean coverage ratio. Peak-shape sampling happens before removing peaks with no positive calling-IP coverage.
+
+Combine the six RBP shape tables into one table before running `peak-shape-tests`; each must retain `rbp`, `calling_ip`, `chrom`, `start`, `peak_class`, `width_nt`, `half_height_span_nt`, and `concentration`. The command tests the difference between replicate-specific and shared medians with a two-sided centred chromosome-stratified genomic-block bootstrap. It adjusts the 12 RBP-by-IP p-values separately for width, half-height span, and concentration.
+
 ## `paired-tests`
 
 Required columns: `family`, `comparison`, `chrom`, `start`, `difference`. Each row is one window-level paired contrast. `family` defines which p-values are adjusted together with Holm's method. For the six-RBP diagnostic tests use separate `pearson` and `emd` families. For the input ablation, use one family containing all six comparisons shown in Figure 3.11. Do not put unrelated exploratory tests into the same file merely because they share a command.
@@ -15,6 +27,24 @@ For sign-flip tests, use `--bootstrap-resamples 3000 --test-resamples 20000`; th
 `--data` is the prepared NPZ from `eclip-reconstruct prepare`. `--predictions` is its prediction NPZ for one configuration and one model seed. `--preprocessing` is the training output `preprocessing.json`. The command writes one row per window with `reconstruction_agreement = r(P1, P2)` and `target_agreement = [r(P1, IP1) + r(P2, IP2)] / 2`. Correlations are over the 300 nucleotide positions. Undefined correlations are recorded as missing.
 
 `reconstruction-differences` combines these rows across configurations and seeds. It requires complete results for every requested configuration, both reported metrics, and both named training seeds. It averages the seed-specific correlations within each window before subtracting each alternative from the reference.
+
+## `gaussian-comparison`, `gaussian-summary`, and `gaussian-differences`
+
+`gaussian-comparison` accepts the same prepared NPZ, prediction NPZ, and preprocessing JSON as `reconstruction-metrics`, plus a seed identifier. Run it for both model seeds on the same chromosome 1 windows and combine the two output tables. Its default Gaussian standard deviation is the chromosome 2 variance-matched value of 26.19 nt. It reports the per-window P1–P2 and prediction–target correlations for the model and crossed Gaussian comparator, each direction's positional variance, absolute log-total signal error, and dominant-feature width. The output also retains each model consensus profile so that width can be measured after the two seed profiles are averaged.
+
+`gaussian-summary` uses complete two-seed windows for correlations and reports their mean across windows. Positional-variance retention is the ratio of summed predicted to summed measured within-window variances, calculated per direction and seed, then averaged. Log-total signal error is the mean absolute difference between `log1p` predicted and target profile sums. Width uses the dominant internal feature's half-height crossings after averaging each window's two seed consensus profiles; it excludes flat or edge-truncated features.
+
+`gaussian-differences --comparison correlation` generates two model-minus-Gaussian paired mean-correlation contrasts. `--comparison width` generates two paired median-width contrasts: autoencoder minus observed and Gaussian minus autoencoder. Each output declares its own Holm family for `paired-tests`.
+
+## `caller-score-comparison`
+
+Supply a prediction NPZ produced by `eclip-reconstruct predict` for one model seed. It must include `consensus`, transformed `sminput`, `split`, and `window_class` alongside the standard window metadata. The command selects validation windows and expects `hard_background`, `peak_derived`, and optionally `zero_ip` class labels by default; use `--peak-class` or `--zero-class` if the prepared manifest uses different names.
+
+The command calculates the maximum of 41 local 100 nt scores per 300 nt parent. It separately calibrates consensus-only and SMInput-adjusted scores against the higher empirical 95th percentile of the validation hard-background maxima. Reported calling percentages refer to parents with a maximum score at or above the corresponding threshold. Average precision treats peak-derived parents as the positive internal reference and all other validation parents as the comparison class. Combine the two seed outputs and average corresponding scheme-level estimates for the thesis development summary.
+
+## `candidate-lengths`
+
+Supply the saved BED call sets from the original merged-interval boundary procedure and the refined boundary procedure applied to the same development sample. Each file needs chromosome, start, and end fields; any additional BED fields are ignored. The command writes one length per interval and a summary with counts, medians, minima, maxima, and the number of lengths exceeding 300 nt. It does not truncate the lengths to the plotted histogram range.
 
 ## `jaccard-blocks` and `call-jaccard`
 

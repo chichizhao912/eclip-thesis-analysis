@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Focused analyses for a replicate-supervised eCLIP reconstruction thesis"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.26,<3", "pandas>=2.0,<3", "scipy>=1.10,<2", "pysam>=0.22"]
+dependencies = ["numpy>=1.26,<3", "pandas>=2.0,<3", "scipy>=1.10,<2", "pysam>=0.22", "pyBigWig>=0.3.22"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]

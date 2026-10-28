@@ -8,12 +8,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from .analyses import (depth_ap, depth_scores, diagnostic_contrasts,
+from .analyses import (coverage_presence, depth_ap, depth_scores, diagnostic_contrasts,
                        jaccard_differences, motif_rate_ratios,
                        outside_peak_motifs, paired_tests, reconstruction_differences,
                        reconstruction_rows)
+from .caller_comparison import caller_score_comparison
+from .candidate_lengths import candidate_lengths
 from .intervals import jaccard_block_table
 from .motifs import motif_block_counts, scan_intervals
+from .peak_diagnostics import peak_diagnostics, peak_shape_tests
+from .profile_comparison import (gaussian_comparison_rows, gaussian_differences,
+                                 gaussian_summary)
 from .ranking import rank_windows
 from .read_depth import simulate
 
@@ -50,6 +55,57 @@ def parser() -> argparse.ArgumentParser:
     diagnostics.add_argument("--data", type=Path, required=True)
     diagnostics.add_argument("--rbp", required=True)
     diagnostics.add_argument("--output", type=Path, required=True)
+
+    presence = sub.add_parser("coverage-presence")
+    presence.add_argument("--data", type=Path, required=True)
+    presence.add_argument("--rbp", required=True)
+    presence.add_argument("--output", type=Path, required=True)
+
+    peaks = sub.add_parser("peak-diagnostics")
+    peaks.add_argument("--rbp", required=True)
+    peaks.add_argument("--ip1-peaks", type=Path, required=True)
+    peaks.add_argument("--ip2-peaks", type=Path, required=True)
+    for track in ("ip1", "ip2", "sminput"):
+        peaks.add_argument(f"--{track}-plus", type=Path, required=True)
+        peaks.add_argument(f"--{track}-minus", type=Path, required=True)
+    peaks.add_argument("--shape-sample", type=int, default=5_000)
+    peaks.add_argument("--output-dir", type=Path, required=True)
+
+    shape = sub.add_parser("peak-shape-tests")
+    shape.add_argument("--input", type=Path, required=True)
+    shape.add_argument("--output", type=Path, required=True)
+    shape.add_argument("--resamples", type=int, default=2_000)
+
+    gaussian = sub.add_parser("gaussian-comparison")
+    gaussian.add_argument("--data", type=Path, required=True)
+    gaussian.add_argument("--predictions", type=Path, required=True)
+    gaussian.add_argument("--preprocessing", type=Path, required=True)
+    gaussian.add_argument("--seed", type=int, required=True)
+    gaussian.add_argument("--sigma", type=float, default=26.19)
+    gaussian.add_argument("--output", type=Path, required=True)
+
+    gaussian_sum = sub.add_parser("gaussian-summary")
+    gaussian_sum.add_argument("--input", type=Path, required=True)
+    gaussian_sum.add_argument("--seeds", nargs="+", type=int, default=[42, 1337])
+    gaussian_sum.add_argument("--output", type=Path, required=True)
+
+    gaussian_diff = sub.add_parser("gaussian-differences")
+    gaussian_diff.add_argument("--input", type=Path, required=True)
+    gaussian_diff.add_argument("--comparison", choices=("correlation", "width"), required=True)
+    gaussian_diff.add_argument("--seeds", nargs="+", type=int, default=[42, 1337])
+    gaussian_diff.add_argument("--output", type=Path, required=True)
+
+    caller_compare = sub.add_parser("caller-score-comparison")
+    caller_compare.add_argument("--predictions", type=Path, required=True)
+    caller_compare.add_argument("--seed", type=int, required=True)
+    caller_compare.add_argument("--peak-class", default="peak_derived")
+    caller_compare.add_argument("--zero-class", default="zero_ip")
+    caller_compare.add_argument("--output", type=Path, required=True)
+
+    lengths = sub.add_parser("candidate-lengths")
+    lengths.add_argument("--original", type=Path, required=True)
+    lengths.add_argument("--refined", type=Path, required=True)
+    lengths.add_argument("--output-dir", type=Path, required=True)
 
     tests = sub.add_parser("paired-tests")
     tests.add_argument("--input", type=Path, required=True)
@@ -135,6 +191,25 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> None:
     args = parser().parse_args(argv)
+    if args.command == "peak-diagnostics":
+        tracks = {key: (getattr(args, f"{key}_plus"), getattr(args, f"{key}_minus"))
+                  for key in ("ip1", "ip2", "sminput")}
+        result = peak_diagnostics(args.rbp, args.ip1_peaks, args.ip2_peaks, tracks,
+                                  shape_sample=args.shape_sample)
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        for name, table in result.items():
+            path = args.output_dir / f"{args.rbp}_{name}.tsv"
+            table.to_csv(path, sep="\t", index=False)
+            print(f"Wrote {len(table)} rows to {path}")
+        return
+    if args.command == "candidate-lengths":
+        all_lengths, summary = candidate_lengths(args.original, args.refined)
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        for name, table in (("lengths", all_lengths), ("summary", summary)):
+            path = args.output_dir / f"candidate_{name}.tsv"
+            table.to_csv(path, sep="\t", index=False)
+            print(f"Wrote {len(table)} rows to {path}")
+        return
     args.output.parent.mkdir(parents=True, exist_ok=True)
     if args.command == "reconstruction-metrics":
         result = reconstruction_rows(args.data, args.predictions, args.preprocessing,
@@ -147,6 +222,24 @@ def main(argv: list[str] | None = None) -> None:
         return
     elif args.command == "diagnostic-contrasts":
         result = diagnostic_contrasts(args.data, args.rbp)
+    elif args.command == "coverage-presence":
+        result = coverage_presence(args.data, args.rbp)
+    elif args.command == "peak-shape-tests":
+        result = peak_shape_tests(pd.read_csv(args.input, sep="\t"),
+                                  resamples=args.resamples)
+    elif args.command == "gaussian-comparison":
+        result = gaussian_comparison_rows(args.data, args.predictions,
+                                          args.preprocessing, args.seed, args.sigma)
+    elif args.command == "gaussian-summary":
+        result = gaussian_summary(pd.read_csv(args.input, sep="\t"),
+                                  seeds=tuple(args.seeds))
+    elif args.command == "gaussian-differences":
+        result = gaussian_differences(pd.read_csv(args.input, sep="\t"),
+                                      args.comparison, seeds=tuple(args.seeds))
+    elif args.command == "caller-score-comparison":
+        result = caller_score_comparison(args.predictions, args.seed,
+                                         peak_class=args.peak_class,
+                                         zero_class=args.zero_class)
     elif args.command == "reconstruction-differences":
         table = pd.read_csv(args.input, sep="\t")
         result = reconstruction_differences(table, args.reference,

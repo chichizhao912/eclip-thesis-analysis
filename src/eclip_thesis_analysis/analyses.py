@@ -30,6 +30,20 @@ def emd(first: np.ndarray, second: np.ndarray) -> float:
     return float(np.abs(left - right).sum())
 
 
+def coverage_presence(data_path: Path, rbp: str) -> pd.DataFrame:
+    """Count measurable IP coverage in each replicate of the supplied windows."""
+    with np.load(data_path, allow_pickle=False) as source:
+        first = np.sum(np.maximum(source["ip1"], 0), axis=1) > 0
+        second = np.sum(np.maximum(source["ip2"], 0), axis=1) > 0
+    counts = {"both": int(np.sum(first & second)),
+              "ip1_only": int(np.sum(first & ~second)),
+              "ip2_only": int(np.sum(~first & second)),
+              "neither": int(np.sum(~first & ~second))}
+    total = len(first)
+    return pd.DataFrame([{"rbp": rbp, "n_windows": total, **counts,
+                          "both_percent": 100 * counts["both"] / total if total else np.nan}])
+
+
 def diagnostic_contrasts(data_path: Path, rbp: str) -> pd.DataFrame:
     """Within-window Pearson and EMD contrasts against SMInput."""
     with np.load(data_path, allow_pickle=False) as source:
