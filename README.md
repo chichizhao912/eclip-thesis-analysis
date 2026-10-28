@@ -2,17 +2,17 @@
 
 This companion package provides analyses for paired-replicate eCLIP reconstruction. It quantifies measured replicate disagreement, evaluates reconstructed profiles and candidate calls, examines ranking under reduced read depth, and measures motif support for prioritised regions.
 
-Its commands turn strand-oriented coverage windows, model predictions, BED calls, and motif matrices into comparison tables with genomic-block uncertainty estimates. Published CLIPper peaks provide an internal reference call set for technical comparisons. The reconstruction model and candidate caller are available in the companion `eclip-reconstruct` package.
+Its commands turn strand-oriented coverage windows, model predictions, BED calls, and motif matrices into comparison tables with genomic-block uncertainty estimates. Published CLIPper peaks provide an internal reference call set for technical comparisons. The reconstruction model and candidate caller are available in the companion [eclip-reconstruct](https://github.com/chichizhao912/eclip-reconstruct) package.
 
 ## Install
 
-Use Python 3.10 or newer. Install this repository and the sibling `eclip-reconstruct` repository in the same environment:
+Use Python 3.10 or newer. From this repository, install the analysis package and the published reconstruction tool in the same environment:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-python -m pip install -e ../eclip-reconstruct
+python -m pip install 'git+https://github.com/chichizhao912/eclip-reconstruct.git'
 # Add the optional FIMO-compatible motif scanner when reproducing motif analyses:
 python -m pip install -e '.[motifs]'
 eclip-thesis-analysis --help
